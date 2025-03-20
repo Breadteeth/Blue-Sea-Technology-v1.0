@@ -12,17 +12,8 @@ class LogisticsVisualizer:
         sns.set_theme()  # 使用 seaborn 默认主题
         sns.set_palette("husl")
         
-    @st.cache_data
-    def plot_solutions(_self, solutions: List[Dict[str, Any]]) -> plt.Figure:
-        """
-        绘制竞价方案对比图
-        
-        Args:
-            solutions: 竞价方案列表，每个方案包含价格、碳排放、时效等信息
-            
-        Returns:
-            matplotlib图表对象
-        """
+    def plot_solutions(self, solutions: List[Dict[str, Any]]) -> plt.Figure:
+        plt.clf()  # 清理全局状态
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
         
         # 提取数据
@@ -68,17 +59,8 @@ class LogisticsVisualizer:
         plt.tight_layout()
         return fig
 
-    @st.cache_data
-    def plot_token_flow(_self, flow_data: List[Dict[str, Any]]) -> plt.Figure:
-        """
-        绘制代币流动图
-        
-        Args:
-            flow_data: 代币交易记录列表
-            
-        Returns:
-            matplotlib图表对象
-        """
+    def plot_token_flow(self, flow_data: List[Dict[str, Any]]) -> plt.Figure:
+        plt.clf()  # 清理全局状态
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10))
         
         # 上图：代币流动网络图
@@ -146,14 +128,31 @@ class LogisticsVisualizer:
         plt.tight_layout()
         return fig
 
-    @st.cache_data
-    def plot_logistics_status(_self, status: Dict[str, Any]) -> plt.Figure:
-        stages = ["warehouse", "customs", "transport", "delivery"]
-        current_stage = status["current_stage"]
+    def plot_logistics_status(self, status: Dict[str, Any]) -> plt.Figure:
+        """
+        绘制物流状态图
         
-        # 将字符串形式的 current_stage 映射为整数索引
-        stage_to_index = {stage: idx for idx, stage in enumerate(stages)}
-        current_stage_index = stage_to_index.get(current_stage, 0)  # 默认值为 0
+        Args:
+            status: 物流状态字典，包含 current_stage 字段（整数，表示当前阶段的索引）
+            
+        Returns:
+            matplotlib图表对象
+        """
+        plt.clf()  # 清理全局状态
+        stages = ["warehouse", "customs", "transport", "delivery"]
+        
+        # 直接使用传入的 current_stage 作为索引
+        current_stage_index = status["current_stage"]
+        
+        # 确保 current_stage_index 是有效的整数
+        if not isinstance(current_stage_index, int):
+            print(f"Error: current_stage_index should be an integer, got {type(current_stage_index)}: {current_stage_index}")
+            current_stage_index = 0
+        else:
+            # 确保索引在有效范围内
+            current_stage_index = max(0, min(current_stage_index, len(stages) - 1))
+        
+        print(f"Debug: plot_logistics_status - current_stage_index: {current_stage_index}")
         
         fig, ax = plt.subplots(figsize=(8, 1))
         for i, stage in enumerate(stages):
@@ -166,19 +165,12 @@ class LogisticsVisualizer:
         ax.set_xticks(range(len(stages)))
         ax.set_xticklabels(stages)
         ax.set_title("Logistics Status")
+        
+        plt.tight_layout()
         return fig
 
-    @st.cache_data
-    def plot_carbon_analysis(_self, carbon_data: List[Dict[str, Any]]) -> plt.Figure:
-        """
-        绘制碳排放分析图表
-        
-        Args:
-            carbon_data: 碳排放数据列表
-            
-        Returns:
-            matplotlib图表对象
-        """
+    def plot_carbon_analysis(self, carbon_data: List[Dict[str, Any]]) -> plt.Figure:
+        plt.clf()  # 清理全局状态
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
         
         # 转换为DataFrame

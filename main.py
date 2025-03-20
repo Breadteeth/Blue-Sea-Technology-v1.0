@@ -204,6 +204,7 @@ class LogisticsApp:
             st.info("请先确认一个方案")
             return
         
+        # 强制获取最新的支付状态
         payment_status = st.session_state.payment_system.get_payment_status(st.session_state.current_payment_id)
         if not payment_status:
             st.error("获取支付状态失败")
@@ -215,11 +216,24 @@ class LogisticsApp:
         # 将 current_stage 转换为索引
         stages = ["warehouse", "customs", "transport", "delivery"]
         stage_to_index = {stage: idx for idx, stage in enumerate(stages)}
-        current_stage_index = stage_to_index.get(payment_status["current_stage"], 0)
+        st.write("Debug: stage_to_index:", stage_to_index)
+        
+        # 清理 current_stage 字符串，确保没有额外的空格或不可见字符
+        current_stage = payment_status["current_stage"].strip()
+        st.write("Debug: payment_status['current_stage'] (after strip):", current_stage)
+        
+        # 检查 current_stage 是否在 stage_to_index 中
+        if current_stage not in stage_to_index:
+            st.error(f"Invalid current_stage: {current_stage}. Expected one of {stages}")
+            current_stage_index = 0
+        else:
+            current_stage_index = stage_to_index[current_stage]
         st.write("Debug: Current stage index:", current_stage_index)
         
         # 渲染物流状态图
+        st.write("Debug: Passing to plot_logistics_status:", {"current_stage": current_stage_index})
         fig = self.visualizer.plot_logistics_status({"current_stage": current_stage_index})
+        # 移除 key 参数
         st.pyplot(fig)
         
         if payment_status["status"] != "completed":
