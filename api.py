@@ -5,6 +5,16 @@ from datetime import datetime, timedelta
 import math
 from blockchain import blockchain
 
+# 模拟全局物流状态存储，用于在模拟环境中存储和更新物流状态
+# 必要性：在模拟环境中，我们没有真实的物流系统数据库，因此使用全局字典来模拟状态存储
+# 合理性：这种方法简化了状态管理，适合快速验证支付和物流流程，而无需引入复杂的数据库或外部 API
+global_logistics_status = {}
+
+# 全局 PaymentSystem 实例，由 main.py 设置
+# 必要性：api.py 需要访问 PaymentSystem 实例以获取支付状态，确保物流状态与支付状态一致
+# 合理性：在模拟环境中，通过全局变量共享实例是一种简化实现的方式，避免了复杂的依赖注入
+global_payment_system = None
+
 class LogisticsAPI:
     def __init__(self):
         self.carbon_factors = {
@@ -51,31 +61,61 @@ class LogisticsAPI:
         return distance * weight * factor * weather_factor
     
     def check_logistics_status(self, tracking_number: str) -> Dict[str, Any]:
-        stages = ["warehouse", "customs", "transport", "delivery"]
-        current_stage = random.choice(stages)
-        delay = random.randint(0, 48) if random.random() > 0.8 else 0  # 20%概率有延误
-        return {
-            "tracking_number": tracking_number,
-            "current_stage": current_stage,
-            "status": "delayed" if delay > 0 else "normal",
-            "last_update": datetime.now().isoformat(),
-            "location": random.choice(["Shanghai", "Singapore", "Bangkok"]),
-            "estimated_arrival": (datetime.now() + timedelta(days=random.randint(1, 7) + delay)).isoformat(),
-            "delay_hours": delay
-        }
+        # 从全局 PaymentSystem 实例中获取当前阶段，确保物流状态与支付状态一致
+        # 必要性：支付系统依赖物流状态来验证支付条件（如 advance_payment 中的检查）
+        # 合理性：在模拟环境中，通过全局实例共享状态是一种简化实现的方式，避免了复杂的实例管理和状态同步机制
+        global global_payment_system
+        if global_payment_system is None:
+            print("Debug: global_payment_system is None, falling back to default stage")
+            current_stage = "warehouse"
+        else:
+            payment = global_payment_system.payments.get(tracking_number, {})
+            current_stage = payment.get("current_stage", "warehouse")
+            print(f"Debug: Retrieved current_stage from payment system: {current_stage}")
+
+        # 如果 global_logistics_status 中有记录，更新 current_stage
+        if tracking_number in global_logistics_status:
+            global_logistics_status[tracking_number]["current_stage"] = current_stage
+        else:
+            # 初始化物流状态
+            global_logistics_status[tracking_number] = {
+                "tracking_number": tracking_number,
+                "current_stage": current_stage,
+                "status": "normal",
+                "last_update": datetime.now().isoformat(),
+                "location": "Shanghai",
+                "estimated_arrival": (datetime.now() + timedelta(days=2)).isoformat(),
+                "delay_hours": 0
+            }
+
+        return global_logistics_status[tracking_number]
     
-    # def verify_compliance(self, user_id: str, amount: float, transaction_type: str) -> bool:
-    #     # 模拟合规性检查，基于信用评分和金额
-    #     credit_score = blockchain.get_node_credit_score(user_id)
-    #     if credit_score < 5.0 or (amount > 1000000 and random.random() > 0.3):
-    #         blockchain.update_node_credit_score(user_id, -1.0)  # 降低信用分
-    #         return False
-    #     return random.random() > 0.1
+    def update_logistics_status(self, tracking_number: str, stage: str) -> None:
+        # 更新物流状态
+        # 必要性：支付系统在推进阶段后需要通知物流系统更新状态，以保持两者一致
+        # 合理性：在模拟环境中，使用全局字典模拟状态更新，简化了真实物流系统的复杂性
+        print(f"Debug: Updating logistics status for tracking_number: {tracking_number} to stage: {stage}")
+        if tracking_number in global_logistics_status:
+            global_logistics_status[tracking_number]["current_stage"] = stage
+            global_logistics_status[tracking_number]["last_update"] = datetime.now().isoformat()
+            global_logistics_status[tracking_number]["location"] = "Singapore" if stage == "transport" else "Shanghai"
+        else:
+            global_logistics_status[tracking_number] = {
+                "tracking_number": tracking_number,
+                "current_stage": stage,
+                "status": "normal",
+                "last_update": datetime.now().isoformat(),
+                "location": "Shanghai",
+                "estimated_arrival": (datetime.now() + timedelta(days=2)).isoformat(),
+                "delay_hours": 0
+            }
     
     def verify_compliance(self, user_id: str, amount: float, transaction_type: str) -> bool:
+        # 简化合规性检查，始终返回 True
+        # 必要性：在模拟环境中，合规性检查不是核心功能，简化后可以专注于支付和物流流程
+        # 合理性：在真实系统中，合规性检查可能涉及复杂的规则（如 KYC、AML 检查），但在模拟程序中可以忽略
         credit_score = blockchain.get_node_credit_score(user_id)
-        print(f"Debug: {user_id} credit_score = {credit_score}")  # 添加调试
-        # 临时返回 True
+        print(f"Debug: {user_id} credit_score = {credit_score}")
         return True
     
     def get_exchange_rate(self, from_currency: str, to_currency: str) -> Optional[float]:
@@ -103,3 +143,6 @@ def verify_compliance(*args, **kwargs):
 
 def get_exchange_rate(*args, **kwargs):
     return logistics_api.get_exchange_rate(*args, **kwargs)
+
+def update_logistics_status(*args, **kwargs):
+    return logistics_api.update_logistics_status(*args, **kwargs)

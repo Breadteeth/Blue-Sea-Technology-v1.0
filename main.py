@@ -10,15 +10,18 @@ from testnet import TestnetLedger
 from demand import process_demand, validate_clp
 from bidding import start_bidding, get_bid_status, bidding_system
 from tokens import token_system
+from payment import PaymentStage
 from payment import PaymentSystem
 from visuals import LogisticsVisualizer
 from api import calculate_distance, fetch_carbon_footprint
+import api  # 导入 api 模块以设置 global_payment_system
 
 class LogisticsApp:
     def __init__(self):
         self.visualizer = LogisticsVisualizer()
         if 'initialized' not in st.session_state:
             self._init_session_state()
+        api.global_payment_system = st.session_state.payment_system  # 设置 api.py 中的全局变量
     
     def _init_session_state(self):
         st.session_state.initialized = True
@@ -31,6 +34,7 @@ class LogisticsApp:
         st.session_state.current_bid_id = None
         st.session_state.current_solutions = None
         st.session_state.selected_solution = None
+        st.session_state.current_payment_id = None  # 初始化 current_payment_id
     
     def run(self):
         st.title("跨境电商物流Demo")
@@ -196,41 +200,51 @@ class LogisticsApp:
     
     def _render_payment_tab(self):
         st.header("支付管理")
-        if "current_payment_id" not in st.session_state:
-            st.info("请先选择物流方案")
+        if st.session_state.current_payment_id is None:
+            st.info("请先确认一个方案")
             return
         
-        payment_id = st.session_state.current_payment_id
-        payment_status = st.session_state.payment_system.get_payment_status(payment_id)
+        payment_status = st.session_state.payment_system.get_payment_status(st.session_state.current_payment_id)
+        if not payment_status:
+            st.error("获取支付状态失败")
+            return
+        
+        st.write("Debug: Payment status before rendering:", payment_status)
         st.json(payment_status)
         
-        fig = self.visualizer.plot_logistics_status({"current_stage": payment_status["current_stage"]})
+        # 将 current_stage 转换为索引
+        stages = ["warehouse", "customs", "transport", "delivery"]
+        stage_to_index = {stage: idx for idx, stage in enumerate(stages)}
+        current_stage_index = stage_to_index.get(payment_status["current_stage"], 0)
+        st.write("Debug: Current stage index:", current_stage_index)
+        
+        # 渲染物流状态图
+        fig = self.visualizer.plot_logistics_status({"current_stage": current_stage_index})
         st.pyplot(fig)
         
-        if st.button("触发下一阶段支付"):
-            try:
-                proof = {"warehouse_receipt": "sample" if payment_status["current_stage"] == "warehouse" else None,
-                         "customs_declaration": "sample" if payment_status["current_stage"] == "customs" else None,
-                         "tracking_status": "in_transit" if payment_status["current_stage"] == "transport" else None,
-                         "delivery_confirmation": "sample" if payment_status["current_stage"] == "delivery" else None}
-                success = st.session_state.payment_system.trigger_stage_payment(
-                    payment_id, PaymentStage(payment_status["current_stage"]), proof
-                )
-                if success:
-                    if st.session_state.mode == "pseudo":
-                        blockchain.add_transaction({"type": "payment_update", "payment_id": payment_id})
-                        blockchain.mine_pending_transactions("SuperNode_A")
+        if payment_status["status"] != "completed":
+            if st.button("触发下一阶段支付"):
+                try:
+                    # 调用 advance_payment
+                    success = st.session_state.payment_system.advance_payment(st.session_state.current_payment_id)
+                    if success:
+                        if st.session_state.mode == "pseudo":
+                            blockchain.add_transaction({"type": "payment_update", "payment_id": st.session_state.current_payment_id})
+                            blockchain.mine_pending_transactions("SuperNode_A")
+                        else:
+                            tx_hash = st.session_state.testnet.trigger_payment(
+                                {"demand_id": st.session_state.current_demand["id"], 
+                                 "stage": payment_status["current_stage"], "amount": payment_status["total_amount"] * 0.3}
+                            )
+                            st.info(f"支付更新已记录到区块链: {tx_hash}")
+                        st.success("支付状态已更新!")
+                        # 强制刷新页面
+                        st.rerun()
                     else:
-                        tx_hash = st.session_state.testnet.trigger_payment(
-                            {"demand_id": st.session_state.current_demand["id"], 
-                             "stage": payment_status["current_stage"], "amount": payment_status["total_amount"] * 0.3}
-                        )
-                        st.info(f"支付更新已记录到区块链: {tx_hash}")
-                    st.success("支付状态已更新!")
-                else:
-                    st.error("支付触发失败")
-            except Exception as e:
-                st.error(f"支付更新失败: {str(e)}")
+                        st.error("支付失败，请检查物流状态")
+                except Exception as e:
+                    st.error(f"支付触发失败，错误信息：{str(e)}")
+                    raise  # 重新抛出异常以便在终端显示堆栈
     
     def _render_status_tab(self):
         st.header("系统状态")
