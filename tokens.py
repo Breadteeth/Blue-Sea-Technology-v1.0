@@ -40,9 +40,16 @@ class TokenSystem:
         blockchain.mine_pending_transactions("SuperNode_A")
     
     def compensate_carbon(self, carrier_id: str, carbon_amount: float) -> None:
+        """处理碳补偿，字段改为 emissions 以匹配可视化"""
         compensation = carbon_amount * self.carbon_price
         self.balances[carrier_id] = self.balances.get(carrier_id, 0) + compensation
-        record = {"carrier_id": carrier_id, "carbon_amount": carbon_amount, "compensation": compensation, "timestamp": time.time()}
+        record = {
+            "carrier_id": carrier_id,
+            "emissions": carbon_amount,  # 改为 emissions
+            "compensation": compensation,
+            "timestamp": time.time(),
+            "transport_type": "sea"  # 默认值
+        }
         self.carbon_records.append(record)
         tx = {"from": "system", "to": carrier_id, "amount": compensation, "type": "carbon_compensation", "timestamp": time.time()}
         self.transactions.append(tx)
@@ -50,7 +57,7 @@ class TokenSystem:
         blockchain.mine_pending_transactions("SuperNode_A")
     
     def get_flow_data(self) -> List[Dict[str, Any]]:
-        return self.transactions[-10:]
+        return self.transactions[-10:] if len(self.transactions) >= 10 else self.transactions
     
     def get_total_supply(self) -> float:
         return self.total_supply
@@ -67,7 +74,7 @@ class TokenSystem:
     
     def get_stats(self) -> Dict[str, Any]:
         avg_balance = sum(self.balances.values()) / len(self.balances) if self.balances else 0
-        carbon_offset = sum(record["carbon_amount"] for record in self.carbon_records)
+        carbon_offset = sum(record["emissions"] for record in self.carbon_records)  # 更新为 emissions
         return {
             "total_supply": self.total_supply,
             "circulation": self.get_circulation(),
@@ -81,9 +88,19 @@ class TokenSystem:
         }
     
     def get_carbon_data(self) -> List[Dict[str, Any]]:
-        return self.carbon_records or [
-            {"transport_type": "sea", "emissions": 100, "compensation": 800, "timestamp": time.time()},
-            {"transport_type": "air", "emissions": 500, "compensation": 4000, "timestamp": time.time()}
+        """获取碳补偿数据，默认数据已使用 emissions"""
+        if self.carbon_records:
+            return self.carbon_records
+        default_data = [
+            {"transport_type": "sea", "emissions": 100, "compensation": 800, "timestamp": time.time() - 86400 * i}
+            for i in range(5)
+        ] + [
+            {"transport_type": "air", "emissions": 500, "compensation": 4000, "timestamp": time.time() - 86400 * i}
+            for i in range(3)
+        ] + [
+            {"transport_type": "land", "emissions": 200, "compensation": 1600, "timestamp": time.time() - 86400 * i}
+            for i in range(2)
         ]
+        return default_data
 
 token_system = TokenSystem()

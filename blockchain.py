@@ -79,12 +79,12 @@ class Blockchain:
         for i, carrier_type in enumerate(carriers):
             node_id = f"Carrier_{carrier_type.capitalize()}"
             self.add_node(node_id, "carrier", stake=800.0)
-            self.nodes[node_id].credit_score = 8.0  # 强制重置信用分
+            self.nodes[node_id].credit_score = 8.0
         # 添加测试用 Carrier_1, Carrier_2, Carrier_3
         for i in range(1, 4):
             node_id = f"Carrier_{i}"
             self.add_node(node_id, "carrier", stake=800.0)
-            self.nodes[node_id].credit_score = 8.0  # 确保信用分正常
+            self.nodes[node_id].credit_score = 8.0
         
         # 添加商家节点
         for i in range(2):
@@ -111,13 +111,12 @@ class Blockchain:
         return self.get_last_block().index + 1
     
     def mine_pending_transactions(self, miner_node_id: str) -> Optional[Block]:
+        """挖掘待处理交易并生成新区块"""
         if not self.pending_transactions:
             return None
         
         if miner_node_id not in self.nodes:
             raise ValueError("Invalid miner node ID")
-        
-        print("Debug: Pending transactions:", self.pending_transactions)  # 添加调试
         
         last_block = self.get_last_block()
         new_block = Block(
@@ -151,15 +150,7 @@ class Blockchain:
         return new_block
     
     def proof_of_work(self, block: Block) -> Block:
-        """
-        工作量证明
-        
-        Args:
-            block: 待挖掘区块
-            
-        Returns:
-            完成工作量证明的区块
-        """
+        """工作量证明"""
         block.nonce = 0
         calculated_hash = block.calculate_hash()
         
@@ -173,7 +164,6 @@ class Blockchain:
     def get_mining_reward(self) -> float:
         """计算挖矿奖励"""
         base_reward = 10.0
-        # 根据链长度调整奖励
         return base_reward * (0.95 ** (len(self.chain) // 100))
     
     def is_chain_valid(self) -> bool:
@@ -181,15 +171,10 @@ class Blockchain:
         for i in range(1, len(self.chain)):
             current_block = self.chain[i]
             previous_block = self.chain[i-1]
-            
-            # 验证当前区块哈希
             if current_block.hash != current_block.calculate_hash():
                 return False
-            
-            # 验证区块链接
             if current_block.previous_hash != previous_block.hash:
                 return False
-        
         return True
     
     def get_last_block(self) -> Block:
@@ -200,10 +185,7 @@ class Blockchain:
         """获取节点代币余额"""
         if node_id not in self.nodes:
             return 0.0
-            
         balance = self.nodes[node_id].stake
-        
-        # 遍历所有区块的交易
         for block in self.chain:
             for tx in block.transactions:
                 if tx["type"] == "mining_reward" and tx["miner"] == node_id:
@@ -213,7 +195,6 @@ class Blockchain:
                         balance -= tx.get("amount", 0)
                     if tx.get("to") == node_id:
                         balance += tx.get("amount", 0)
-        
         return balance
     
     def get_node_credit_score(self, node_id: str) -> float:
@@ -222,8 +203,7 @@ class Blockchain:
             return 0.0
         return self.nodes[node_id].credit_score
     
-    def update_node_credit_score(self, node_id: str, 
-                               score_change: float) -> None:
+    def update_node_credit_score(self, node_id: str, score_change: float) -> None:
         """更新节点信用分"""
         if node_id in self.nodes:
             self.nodes[node_id].credit_score = max(0.0, min(10.0, 
@@ -231,35 +211,19 @@ class Blockchain:
     
     def select_super_node(self) -> Optional[str]:
         """选择超级节点（用于出块）"""
-        super_nodes = [
-            node_id for node_id, node in self.nodes.items()
-            if node.node_type == "super_node"
-        ]
-        
+        super_nodes = [node_id for node_id, node in self.nodes.items() if node.node_type == "super_node"]
         if not super_nodes:
             return None
-            
-        # 基于质押量和信用分加权选择
-        weights = []
-        for node_id in super_nodes:
-            node = self.nodes[node_id]
-            weight = node.stake * node.credit_score
-            weights.append(weight)
-            
+        weights = [self.nodes[node_id].stake * self.nodes[node_id].credit_score for node_id in super_nodes]
         return random.choices(super_nodes, weights=weights, k=1)[0]
     
     def get_chain_stats(self) -> Dict[str, Any]:
         """获取区块链统计信息"""
         return {
             "block_count": len(self.chain),
-            "transaction_count": sum(
-                len(block.transactions) for block in self.chain
-            ),
+            "transaction_count": sum(len(block.transactions) for block in self.chain),
             "node_count": len(self.nodes),
-            "super_node_count": len([
-                node for node in self.nodes.values()
-                if node.node_type == "super_node"
-            ]),
+            "super_node_count": len([node for node in self.nodes.values() if node.node_type == "super_node"]),
             "average_block_time": self._calculate_average_block_time(),
             "total_stake": sum(node.stake for node in self.nodes.values())
         }
@@ -268,12 +232,10 @@ class Blockchain:
         """计算平均出块时间"""
         if len(self.chain) < 2:
             return 0.0
-            
         total_time = self.chain[-1].timestamp - self.chain[0].timestamp
         return total_time / (len(self.chain) - 1)
     
-    def get_node_transactions(self, node_id: str, 
-                            limit: int = 10) -> List[Dict[str, Any]]:
+    def get_node_transactions(self, node_id: str, limit: int = 10) -> List[Dict[str, Any]]:
         """获取节点相关的交易"""
         transactions = []
         for block in reversed(self.chain):
@@ -289,6 +251,26 @@ class Blockchain:
                 if len(transactions) >= limit:
                     return transactions
         return transactions
+    
+    def get_active_nodes(self) -> List[str]:
+        """获取活跃节点列表（最近参与交易或挖矿的节点）"""
+        active_nodes = set()
+        # 检查最近 10 个区块内的活跃节点
+        for block in self.chain[-10:] if len(self.chain) > 10 else self.chain:
+            for tx in block.transactions:
+                if "miner" in tx:
+                    active_nodes.add(tx["miner"])
+                if "from" in tx:
+                    active_nodes.add(tx["from"])
+                if "to" in tx:
+                    active_nodes.add(tx["to"])
+                # 检查交易数据中可能的节点ID
+                if "data" in tx and isinstance(tx["data"], dict):
+                    if "carrier_id" in tx["data"]:
+                        active_nodes.add(tx["data"]["carrier_id"])
+                    if "merchant_id" in tx["data"]:
+                        active_nodes.add(tx["data"]["merchant_id"])
+        return list(active_nodes)
 
 # 创建全局区块链实例
 blockchain = Blockchain()

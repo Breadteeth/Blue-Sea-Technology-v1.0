@@ -61,23 +61,25 @@ class LogisticsAPI:
         return distance * weight * factor * weather_factor
     
     def check_logistics_status(self, tracking_number: str) -> Dict[str, Any]:
-        # 从全局 PaymentSystem 实例中获取当前阶段，确保物流状态与支付状态一致
-        # 必要性：支付系统依赖物流状态来验证支付条件（如 advance_payment 中的检查）
-        # 合理性：在模拟环境中，通过全局实例共享状态是一种简化实现的方式，避免了复杂的实例管理和状态同步机制
+        """检查物流状态，优先使用 global_logistics_status，确保与支付状态同步"""
         global global_payment_system
-        if global_payment_system is None:
-            print("Debug: global_payment_system is None, falling back to default stage")
-            current_stage = "warehouse"
-        else:
+        
+        # 优先从 global_logistics_status 获取状态
+        if tracking_number in global_logistics_status:
+            current_stage = global_logistics_status[tracking_number]["current_stage"]
+            print(f"Debug: Retrieved current_stage from global_logistics_status: {current_stage}")
+        # 若无记录，尝试从 global_payment_system 获取
+        elif global_payment_system is not None:
             payment = global_payment_system.payments.get(tracking_number, {})
             current_stage = payment.get("current_stage", "warehouse")
             print(f"Debug: Retrieved current_stage from payment system: {current_stage}")
-
-        # 如果 global_logistics_status 中有记录，更新 current_stage
-        if tracking_number in global_logistics_status:
-            global_logistics_status[tracking_number]["current_stage"] = current_stage
+        # 最后的 fallback
         else:
-            # 初始化物流状态
+            print("Debug: global_payment_system is None, falling back to default stage")
+            current_stage = "warehouse"
+
+        # 更新或初始化 global_logistics_status
+        if tracking_number not in global_logistics_status:
             global_logistics_status[tracking_number] = {
                 "tracking_number": tracking_number,
                 "current_stage": current_stage,
@@ -87,13 +89,14 @@ class LogisticsAPI:
                 "estimated_arrival": (datetime.now() + timedelta(days=2)).isoformat(),
                 "delay_hours": 0
             }
+        else:
+            global_logistics_status[tracking_number]["current_stage"] = current_stage
+            global_logistics_status[tracking_number]["last_update"] = datetime.now().isoformat()
 
         return global_logistics_status[tracking_number]
     
     def update_logistics_status(self, tracking_number: str, stage: str) -> None:
-        # 更新物流状态
-        # 必要性：支付系统在推进阶段后需要通知物流系统更新状态，以保持两者一致
-        # 合理性：在模拟环境中，使用全局字典模拟状态更新，简化了真实物流系统的复杂性
+        """更新物流状态，确保状态持久化"""
         print(f"Debug: Updating logistics status for tracking_number: {tracking_number} to stage: {stage}")
         if tracking_number in global_logistics_status:
             global_logistics_status[tracking_number]["current_stage"] = stage
@@ -111,18 +114,16 @@ class LogisticsAPI:
             }
     
     def verify_compliance(self, user_id: str, amount: float, transaction_type: str) -> bool:
-        # 简化合规性检查，始终返回 True
-        # 必要性：在模拟环境中，合规性检查不是核心功能，简化后可以专注于支付和物流流程
-        # 合理性：在真实系统中，合规性检查可能涉及复杂的规则（如 KYC、AML 检查），但在模拟程序中可以忽略
+        """简化合规性检查"""
         credit_score = blockchain.get_node_credit_score(user_id)
         print(f"Debug: {user_id} credit_score = {credit_score}")
         return True
     
     def get_exchange_rate(self, from_currency: str, to_currency: str) -> Optional[float]:
+        """获取汇率，带动态波动"""
         if from_currency not in self.exchange_rates or to_currency not in self.exchange_rates[from_currency]:
             return None
         base_rate = self.exchange_rates[from_currency][to_currency]
-        # 动态波动基于时间
         hour = datetime.now().hour
         fluctuation = math.sin(hour / 24 * 2 * math.pi) * 0.05  # ±5%日内波动
         return base_rate * (1 + fluctuation)
