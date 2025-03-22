@@ -39,8 +39,8 @@ This demo simulates a public blockchain platform connecting cross-border e-comme
    - Matplotlib charts for solution comparisons, token flow, and carbon emission analysis (`visuals.py`).
 
 ### Innovations
-- **Disintermediation**: Eliminates freight forwarder intermediaries, reducing logistics costs by 18%-22%.
-- **Carbon Reduction**: Ties economic incentives to carbon emissions, lowering per-unit transport emissions by 25%-30%.
+- **Disintermediation**: Eliminates freight forwarder intermediaries, reducing logistics costs.
+- **Carbon Reduction**: Ties economic incentives to carbon emissions, lowering per-unit transport emissions.
 - **Dual-Mode Ledger**: Balances demo simplicity (pseudo-distributed) with scalability (testnet support).
 - **Enhanced Trust**: Combines API integration and CLP verification to improve compliance and authenticity.
 

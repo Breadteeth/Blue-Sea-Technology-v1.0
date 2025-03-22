@@ -193,8 +193,8 @@ After launching, you’ll see the Streamlit interface titled “Cross-Border E-C
 ### 7. User Insights and Benefits
 
 Through a full demo experience, you’ll gain the following insights and valuable information:
-- **Potential of Disintermediation**: Learn how multi-stage bidding and automated payments eliminate traditional freight forwarders, reducing logistics costs (estimated 18%-22%).
-- **Green Logistics Incentives**: Observe how carbon compensation via token economics encourages eco-friendly transport choices, reducing per-unit emissions by 25%-30%.
+- **Potential of Disintermediation**: Learn how multi-stage bidding and automated payments eliminate traditional freight forwarders, reducing logistics costs.
+- **Green Logistics Incentives**: Observe how carbon compensation via token economics encourages eco-friendly transport choices, reducing per-unit emissions.
 - **Blockchain Transparency**: The pseudo-distributed ledger records every step, demonstrating how distributed technology boosts trust and efficiency.
 - **Payment-Logistics Linkage**: Experience real-time binding of payments to logistics milestones (e.g., warehousing, customs), understanding future trends in smart payments.
 - **Visualization Insights**: Use solution comparison charts and token flow networks to intuitively grasp trade-offs between price, carbon emissions, and timeliness, as well as token economy dynamics.
